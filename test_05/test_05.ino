@@ -1,12 +1,13 @@
-// version wemos
-#include <limits.h>
+/**************************************************************
+  bytebeat 2018
+  parc. lima.
+**************************************************************/
+#include <limits.h>;
 #include <SPI.h>
 
-
-#define LATCH     D1           // ROWS and COLS
-#define COLS_DATA D2
-#define COLS_SH   D3
-
+#define LATCH 6           // ROWS and COLS
+#define COLS_DATA 7
+#define COLS_SH   8
 // #define ROWS_DATA  11  // MOSI (SPI)
 // #define ROWS_SH  13  // SCK (SPI)
 
@@ -207,7 +208,3 @@ void latch(int column) {
   delayMicroseconds(latchTime);
   digitalWrite(LATCH, HIGH);
 }
-
-
-
-

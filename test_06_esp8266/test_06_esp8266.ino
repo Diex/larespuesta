@@ -1,14 +1,25 @@
-// version wemos
-#include <limits.h>
+/**************************************************************
+  bytebeat 2018
+  parc. lima.
+**************************************************************/
+#include <limits.h>;
 #include <SPI.h>
+// ROWS and COLS
+//#define LATCH 6                       // 12 en esp8266 
+//#define COLS_DATA 7                   // 13 en esp8266
+//#define COLS_SH   8                   // 15 en esp8266
+// #define ROWS_DATA  11              // MOSI (SPI)
+// #define ROWS_SH  13                // SCK (SPI)
 
 
-#define LATCH     D1           // ROWS and COLS
-#define COLS_DATA D2
-#define COLS_SH   D3
+// esp8266
 
-// #define ROWS_DATA  11  // MOSI (SPI)
-// #define ROWS_SH  13  // SCK (SPI)
+#define COLS_DATA 4                   // GPIO2 en esp8266
+#define COLS_SH   3                   // GPIO0
+#define ROWS_DATA  12                 // MOSI (SPI)
+#define ROWS_SH  16                   // SCK (SPI)
+#define LATCH 8                       // GPIO15
+
 
 #define col_0 B00000001
 #define col_1 B00000010
@@ -207,7 +218,3 @@ void latch(int column) {
   delayMicroseconds(latchTime);
   digitalWrite(LATCH, HIGH);
 }
-
-
-
-

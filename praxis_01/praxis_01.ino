@@ -1,14 +1,16 @@
-// version wemos
-#include <limits.h>
+/**************************************************************
+  bytebeat 2018
+  parc. lima.
+**************************************************************/
+#include <limits.h>;
 #include <SPI.h>
+// adaptado para ESP8266 wemos d1 mini
 
-
-#define LATCH     D1           // ROWS and COLS
+#define LATCH D1           // ROWS and COLS
 #define COLS_DATA D2
-#define COLS_SH   D3
-
-// #define ROWS_DATA  11  // MOSI (SPI)
-// #define ROWS_SH  13  // SCK (SPI)
+#define COLS_SH   D3v
+// #define ROWS_DATA  D7  // MOSI (SPI)
+// #define ROWS_SH  D5  // SCK (SPI)
 
 #define col_0 B00000001
 #define col_1 B00000010
@@ -207,7 +209,3 @@ void latch(int column) {
   delayMicroseconds(latchTime);
   digitalWrite(LATCH, HIGH);
 }
-
-
-
-
