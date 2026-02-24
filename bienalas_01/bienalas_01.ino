@@ -7,6 +7,7 @@
 #define LATCH     6
 #define COLS_DATA 7
 #define COLS_SH   8
+#define CONFIG_JUMPER 2   // pulled LOW → TESTING mode
 
 // --- constants ---
 #define COLS_PER_PANEL 8
@@ -42,6 +43,7 @@ void setup() {
   pinMode(LATCH,     OUTPUT);
   pinMode(COLS_DATA, OUTPUT);
   pinMode(COLS_SH,   OUTPUT);
+  pinMode(CONFIG_JUMPER, INPUT_PULLUP);
 
   Serial.begin(115200);
   SPI.begin();
@@ -55,6 +57,7 @@ void setup() {
     buffer[i] = 0;
   }
   formula = random(0, 3);
+  if (digitalRead(CONFIG_JUMPER) == LOW) state = TESTING;
 }
 
 void getRandomSeed() {
@@ -131,24 +134,24 @@ void update() {
   if (iterations % 32000 == 0) formula = (formula + 1) % 4;
 
   for (int column = 0; column < COLS_PER_PANEL; column++) {
-    // generate one quarter of the grid, mirror vertically and horizontally
+    // compute top half; antiId reflects each entry to the bottom half
     for (int panel = 0; panel < NUM_PANELS / 2; panel++) {
 
-      unsigned char line = pattern(iterations, column, panel);
+      unsigned char line  = pattern(iterations, column, panel);
+      unsigned char rline = reverse(line);          // top↔bottom mirror within row bytes
 
-      // horizontal symmetry
-      int id = column + (COLS_PER_PANEL * panel);
-      buffer[id]  =  long(line);
-      buffer[id] |=  long(line)          << 8;
-      buffer[id] |=  long(reverse(line)) << 16;
-      buffer[id] |=  long(reverse(line)) << 24;
+      // row bytes [rline|rline|line|line]: rline mirrors top↔bottom inside each panel
+      unsigned long entry = ((unsigned long)rline << 24)
+                          | ((unsigned long)rline << 16)
+                          | ((unsigned long)line  <<  8)
+                          |  (unsigned long)line;
 
-      // vertical symmetry
-      int antiId = (COLS_PER_PANEL - 1 - column) + (COLS_PER_PANEL * (NUM_PANELS - panel - 1));
-      buffer[antiId]  =  long(line);
-      buffer[antiId] |=  long(line)          << 8;
-      buffer[antiId] |=  long(reverse(line)) << 16;
-      buffer[antiId] |=  long(reverse(line)) << 24;
+      int id     = column + COLS_PER_PANEL * panel;
+      int antiId = (COLS_PER_PANEL - 1 - column) + COLS_PER_PANEL * (NUM_PANELS - 1 - panel);
+      // antiId: (COLS_PER_PANEL-1-column) → left↔right mirror; (NUM_PANELS-1-panel) → bottom half
+
+      buffer[id]     = entry;
+      buffer[antiId] = entry;
     }
   }
 }
