@@ -85,6 +85,28 @@ Each returns a byte. The active formula switches periodically (random or counter
 
 `reverse()` does byte-level bit reversal using swap-based algorithm (nibbles → pairs → bits).
 
+## Emulator
+
+`emulator/bienalas_emulator.py` — pygame LED matrix visualizer, exact port of `bienalas_01.ino` logic.
+
+```bash
+pip install pygame>=2.0
+python3 emulator/bienalas_emulator.py
+```
+
+Controls: `0–9` select formula, `SPACE` pause, `+/-` speed, `R` randomize seed, `A` toggle auto, `ESC` quit.
+
+### .ino / emulator parity
+
+When editing `bienalas_01.ino` or writing new sketches, keep these in sync with the emulator:
+
+1. **Formula expressions** — `FORMULAS[]` list in the emulator must match the `switch(formula)` cases in `bytebeat()`. Adding or reordering formulas requires updating both files.
+2. **16-bit arithmetic** — AVR `unsigned ut = unsigned(t)` truncates to 16 bits. Python: `ut = t & 0xFFFF`. The `int it` parameter in `pattern()` also truncates `iterations` to 16 bits before formula math. Preserve both truncations in any refactor.
+3. **Buffer entry layout** — each 32-bit entry is `[rline | rline | line | line]` (bytes 3–0). `rline = reverse(line)`. Byte-order changes in the .ino must be mirrored in the emulator's `update()`.
+4. **Symmetry index math** — `id = column + COLS_PER_PANEL * panel`; `anti_idx = (COLS_PER_PANEL-1-column) + COLS_PER_PANEL*(NUM_PANELS-1-panel)`. Both slots receive the same `entry`. Do not alter without updating the emulator.
+5. **Timing constants** — `dtime=45` ms, `offTime=6000` ms, burst every 32 frames map to emulator constants `DTIME_DEFAULT`, `OFF_TIME_MS`, `BURST_FRAMES`. Update both if defaults change.
+6. **Formula advance** — `iterations % 32000 == 0` uses the full 32-bit counter; pattern generation uses `it16 = iterations & 0xFFFF`. Keep these two paths separate.
+
 ## Sketch progression
 
 Each folder contains a single `.ino` file with matching name.
