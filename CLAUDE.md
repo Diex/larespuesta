@@ -18,6 +18,8 @@ Procedural LED art display using bytebeat algorithms on 74HC595 shift registers.
 
 Column selection uses `shiftOut()` (software). Row data uses hardware SPI (`SPI.transfer()`, LSBFIRST, MODE0, DIV8).
 
+**Known-good reference sketches:** `santafe_01` (Arduino UNO/Nano) and `simetria_04` (Wemos D1 Mini).
+
 ## Build & upload
 
 No platformio.ini or Makefile — use Arduino IDE or `arduino-cli`.
@@ -107,11 +109,13 @@ Each folder contains a single `.ino` file with matching name.
 - `simetria_01/` — initial symmetry on D1 Mini (note: has typo `D3v` in pin define)
 - `simetria_02/` — probability-based formula switching
 - `simetria_03/` — aggressive formula variation, 15ms timing
-- `simetria_04/` — tuned timing (30ms) and switching rates
+- `simetria_04/` — tuned timing (15ms) and switching rates
 
 ### Phase 5 — Production
 - `santafe_01/` — state machine (RUNNING/TESTING/STOP), counter-based pause, 4th formula, best-commented version
 
 ## Known issues
 
-- `simetria_01/simetria_01.ino`: pin define typo `D3v` should be `D3` — will not compile as-is
+- `test_01/test_01.ino`: `latchTime` = 10µs (vs 500µs standard) — very short latch pulse, may cause display glitches if shift registers can't respond in time.
+- `test_06_esp8266/test_06_esp8266.ino`: uses raw GPIO numbers instead of Wemos D-pin aliases (`LATCH=8` → GPIO15, `COLS_DATA=4` → GPIO2, `COLS_SH=3` → GPIO0). GPIO15 is a boot strapping pin that must be LOW at boot — connecting shift register hardware here may cause boot failures on Wemos D1 Mini. Use `simetria_04` as the reference ESP8266 sketch instead.
+- `simetria_01/simetria_01.ino`: fixed — pins corrected to D1/D2/D3 (were Arduino-style integers 6/7/8), and `diex()` call in `pattern()` fixed to pass required `formula` argument.

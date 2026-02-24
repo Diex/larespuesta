@@ -5,9 +5,9 @@
 #include <limits.h>;
 #include <SPI.h>
 
-#define LATCH 6           // ROWS and COLS
-#define COLS_DATA 7
-#define COLS_SH   8
+#define LATCH D1          // ROWS and COLS (Wemos D1 Mini)
+#define COLS_DATA D2
+#define COLS_SH   D3
 // #define ROWS_DATA  11  // MOSI (SPI)
 // #define ROWS_SH  13  // SCK (SPI)
 
@@ -96,7 +96,7 @@ void loop() {
 #define NUM_PANELS 8
 
 unsigned char pattern(int it, int col, int pan){
-  return diex(it+pan * NUM_COLS+col);
+  return diex(it+pan * NUM_COLS+col, 0);
 }
 void update2() {
   iterations = (iterations + 1);        
