@@ -64,9 +64,12 @@ FORMULAS: list[tuple[str, str]] = [
     ("formula_1",  "ut * (((ut >> 12) & (ut >> 8)) ^ (31 & (ut >> 3)))"),
     ("formula_2",  "ut * (((ut >> 23) & (ut >> 13)) ^ (19 & (ut >> 5)))"),
     ("test_grid",  "85 << (ut % 2)"),
+    ("all_on",     "0xFF"),             # all LEDs on — hardware test
     # ── add custom formulas here ──────────────────────────────────────────────
     # ("my_formula", "ut * ((ut >> 10) ^ (ut >> 6))"),
 ]
+
+NUM_AUTO_FORMULAS = 4   # formulas 0–3 auto-cycle; higher indices are test-only
 
 
 # ── pre-compile formula strings to fast callables ────────────────────────────
@@ -120,7 +123,7 @@ def update(buf: list, iterations: int, formula: int) -> int:
     """
     # periodic formula advance — uses the full 32-bit iterations value
     if iterations % 32000 == 0:
-        formula = (formula + 1) % len(FORMULAS)
+        formula = (formula + 1) % NUM_AUTO_FORMULAS
 
     # pattern generation uses only the lower 16 bits (AVR int truncation)
     it16 = iterations & 0xFFFF

@@ -91,7 +91,7 @@ void loop() {
         break;
 
       case TESTING:
-        formula  = 3;
+        formula  = 4;
         offTime  = 2000;
         if (millis() > (lastOff + offTime)) {
           update();
@@ -120,6 +120,9 @@ static inline char bytebeat(long t, int formula) {
       break;
     case 3:
       return 85 << (ut % 2);
+      break;
+    case 4:
+      return 0xFF;   // all LEDs on — hardware test
       break;
   }
 }
