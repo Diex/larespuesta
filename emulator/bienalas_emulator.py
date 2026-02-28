@@ -19,6 +19,7 @@ Controls:
   +/-    speed up / slow down  (±5 ms per step)
   R      randomize iteration seed
   A      toggle automatic formula switching
+  F      toggle FIXED mode (lock formula, no burst/pause, no auto-advance)
   ESC    quit
 """
 
@@ -34,7 +35,8 @@ BUFFER_SIZE    = COLS_PER_PANEL * NUM_PANELS   # 64 entries
 # ── timing — matches .ino defaults ───────────────────────────────────────────
 DTIME_DEFAULT = 45      # ms per animation frame  (dtime = 45 in .ino)
 OFF_TIME_MS   = 6000    # pause duration between bursts  (offTime = 6000)
-BURST_FRAMES  = 32      # frames per running burst before auto-pause
+BURST_FRAMES          = 32      # frames per running burst before auto-pause
+FORMULA_ADVANCE_ITERS = 32000  # frames between periodic formula steps (~24 min at 45ms)
 
 # ── display geometry ──────────────────────────────────────────────────────────
 ROWS     = 32           # 4 bytes × 8 bits per buffer entry
@@ -63,13 +65,18 @@ FORMULAS: list[tuple[str, str]] = [
     ("formula_0",  "ut * (((ut >> 12) | (ut >> 8)) & (31 & (ut >> 4)))"),
     ("formula_1",  "ut * (((ut >> 12) & (ut >> 8)) ^ (31 & (ut >> 3)))"),
     ("formula_2",  "ut * (((ut >> 23) & (ut >> 13)) ^ (19 & (ut >> 5)))"),
+    ("formula_3",  "ut>>16|((ut>>4)%16)|((ut>>4)%192)|(ut*ut%64)|(ut*ut%96)|(ut>>16)*(ut|ut>>5)"),
+    ("formula_4",  "ut*(ut^ut+(ut>>15|1)^((ut-1280^ut)>>10))"),
+    ("formula_5",  "ut>>6^ut&37|ut+(ut^ut>>11)-ut*((2 if ut%24 else 6)&ut>>11)^ut<<1&(ut>>4 if ut&598 else ut>>10)"),
+    ("formula_6",  "((ut//2*(15&(0x234568a0>>(ut>>8&28))))|ut//2>>(ut>>11)^ut>>12)+(ut//16&ut&24)"),
+    ("formula_7",  "(ut*9&ut>>4|ut*5&ut>>7|ut*3&ut//1024)-1"),
+    ("formula_8",  "ut*(((ut>>9)&10)|((ut>>11)&24)^((ut>>10)&15&(ut>>15)))"),
     ("test_grid",  "85 << (ut % 2)"),
     ("all_on",     "0xFF"),             # all LEDs on — hardware test
-    # ── add custom formulas here ──────────────────────────────────────────────
-    # ("my_formula", "ut * ((ut >> 10) ^ (ut >> 6))"),
+    # ── add new formulas here; update NUM_FORMULAS in .ino above ─────────────
 ]
 
-NUM_AUTO_FORMULAS = 4   # formulas 0–3 auto-cycle; higher indices are test-only
+NUM_AUTO_FORMULAS = 9   # formulas 0–8 auto-cycle; 9+ are test-only
 
 
 # ── pre-compile formula strings to fast callables ────────────────────────────
@@ -122,7 +129,7 @@ def update(buf: list, iterations: int, formula: int) -> int:
     'iterations' is the full 32-bit counter.
     """
     # periodic formula advance — uses the full 32-bit iterations value
-    if iterations % 32000 == 0:
+    if iterations % FORMULA_ADVANCE_ITERS == 0:
         formula = (formula + 1) % NUM_AUTO_FORMULAS
 
     # pattern generation uses only the lower 16 bits (AVR int truncation)
@@ -163,14 +170,15 @@ def window_size() -> tuple[int, int]:
 
 
 def draw(
-    screen:   pygame.Surface,
-    buf:      list,
-    font:     pygame.font.Font,
-    formula:  int,
-    iters:    int,
-    running:  bool,
-    dtime:    int,
-    auto_sw:  bool,
+    screen:    pygame.Surface,
+    buf:       list,
+    font:      pygame.font.Font,
+    formula:   int,
+    iters:     int,
+    animating: bool,
+    dtime:     int,
+    auto_sw:   bool,
+    fixed:     bool,
 ) -> None:
 
     screen.fill(C_BG)
@@ -189,9 +197,13 @@ def draw(
     # ── status bar ────────────────────────────────────────────────────────────
     _, h = screen.get_size()
     fname, fexpr = FORMULAS[formula] if formula < len(FORMULAS) else ("?", "?")
-    sc = C_PAUSE if not running else C_TEXT
-    state_s = "PAUSE" if not running else "RUN  "
-    auto_s  = "AUTO" if auto_sw else "MANU"
+    sc = C_PAUSE if not animating else C_TEXT
+    state_s = "PAUSE" if not animating else "RUN  "
+    if fixed:
+        auto_s  = "FIXD"
+        sc      = (80, 220, 130)    # green tint for FIXED
+    else:
+        auto_s  = "AUTO" if auto_sw else "MANU"
 
     line1 = font.render(
         f"[{state_s}] [{auto_s}]  formula {formula}: {fname}"
@@ -217,12 +229,15 @@ def main() -> None:
 
     buf        = [0] * BUFFER_SIZE
     iterations = random.randint(0, 9_999_999)          # random(10E6) in .ino
-    formula    = random.randint(0, min(2, len(FORMULAS) - 1))
-    switch1    = True    # True = RUNNING phase, False = PAUSE burst
+    formula    = random.randint(0, NUM_AUTO_FORMULAS - 1)
+    animating  = True    # True = playing, False = paused between bursts
     counter    = 0
+    burst_len  = random.randint(8, 63)
+    off_time   = OFF_TIME_MS
     last_off   = 0
     dtime      = DTIME_DEFAULT
     auto_sw    = True    # enable auto pause/formula switching
+    fixed      = False   # FIXED: animate continuously, never switch formula
     last_upd   = pygame.time.get_ticks()
 
     running = True
@@ -243,8 +258,8 @@ def main() -> None:
                         formula = idx
 
                 elif k == pygame.K_SPACE:
-                    switch1 = not switch1
-                    if not switch1:
+                    animating = not animating
+                    if not animating:
                         last_off = pygame.time.get_ticks()
 
                 elif k in (pygame.K_PLUS, pygame.K_EQUALS, pygame.K_KP_PLUS):
@@ -259,25 +274,37 @@ def main() -> None:
                 elif k == pygame.K_a:
                     auto_sw = not auto_sw
 
+                elif k == pygame.K_f:
+                    fixed = not fixed
+
         now = pygame.time.get_ticks()
         if now - last_upd >= dtime:
-            if switch1:
+            if fixed:
+                # FIXED: run continuously, formula never changes
+                if animating:
+                    iterations += 1
+                    update(buf, iterations, formula)   # ignore returned formula
+            elif animating:
                 iterations += 1
                 formula = update(buf, iterations, formula)
                 counter += 1
 
-                if auto_sw and (counter % BURST_FRAMES) == 0:
-                    switch1  = False
-                    last_off = now
+                if auto_sw and counter >= burst_len:
+                    counter   = 0
+                    animating = False
+                    last_off  = now
+                    off_time  = random.randint(2000, 9000)
+                    dtime     = random.randint(20, 80)
+                    burst_len = random.randint(8, 63)
                     if random.randint(0, 9) < 3:
-                        formula = random.randint(0, min(2, len(FORMULAS) - 1))
+                        formula = random.randint(0, NUM_AUTO_FORMULAS - 1)
             else:
-                if now > last_off + OFF_TIME_MS:
-                    switch1 = True
+                if now > last_off + off_time:
+                    animating = True
 
             last_upd = now
 
-        draw(screen, buf, font, formula, iterations, switch1, dtime, auto_sw)
+        draw(screen, buf, font, formula, iterations, animating, dtime, auto_sw, fixed)
         pygame.display.flip()
         clock.tick(120)
 
